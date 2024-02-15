@@ -1,0 +1,146 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+The [R plugin](https://www.jetbrains.com/help/pycharm/r-plugin-support.html) for IntelliJ-based IDEs provides
+handy capabilities to work with the [R Markdown](https://www.jetbrains.com/help/pycharm/r-markdown.html) files.
+To [add](https://www.jetbrains.com/help/pycharm/r-markdown.html#add-code-chunk) a new R chunk,
+position the caret at any line or the code chunk, then click "+".
+
+
+Imports:
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+```
+
+The code chunk appears:
+```{r}
+# Reading the dataset
+data_rent <- read.csv("./rent_merge_2018_2023.csv", dec = ",", header = TRUE, sep = ";")
+# Convert categorical variables to factors (dummy variables)
+categorical_vars <- c('gym', 'field_quadra', 'elevator', 'furnished', 'swimming_pool')
+data_rent[categorical_vars] <- lapply(data_rent[categorical_vars], as.factor)
+
+# Quick summary to check the conversion
+summary(data_rent[categorical_vars])
+```
+
+Type any R code in the chunk, for example:
+```{r}
+data_rent <- read.csv("./rent_merge_2018_2023.csv", dec = ",", header = T, sep = ";")
+```
+
+
+
+```{r}
+data_rent$gym <- as.factor(data_rent$gym)
+data_rent$field_quadra <- as.factor(data_rent$field_quadra)
+data_rent$elevator <- as.factor(data_rent$elevator)
+data_rent$furnished <- as.factor(data_rent$furnished)
+data_rent$swimming_pool <- as.factor(data_rent$swimming_pool)
+```
+
+```{r}
+data_rent$date <- as.Date(data_rent$date, format = "%d/%m/%Y")
+data_rent$date <- as.Date(data_rent$date, format = "%d/%m/%Y")
+```
+
+
+```{r}
+reg <- lm(price_real_month ~ area_m2 +
+  bedrooms +
+  suite +
+  bathrooms +
+  garage +
+  condo_real +
+  metro_dist_km +
+  gym +
+  field_quadra +
+  elevator +
+  furnished +
+  swimming_pool, data = data_rent)
+summary(reg)
+```
+
+
+
+```{r}
+# Calculate the IQR for area_m2 and price_real_month
+Q1_area <- quantile(data_rent$area_m2, 0.25)
+Q3_area <- quantile(data_rent$area_m2, 0.75)
+IQR_area <- Q3_area - Q1_area
+
+Q1_price <- quantile(data_rent$price_real_month, 0.25)
+Q3_price <- quantile(data_rent$price_real_month, 0.75)
+IQR_price <- Q3_price - Q1_price
+
+# Define custom bounds for the desired range
+desired_max_area <- 500
+desired_max_price <- 15000
+
+# Calculate custom multipliers based on the desired maximum values
+multiplier_area <- (desired_max_area - Q3_area) / IQR_area
+multiplier_price <- (desired_max_price - Q3_price) / IQR_price
+
+# Use the larger of the calculated multipliers or the default 1.5, whichever is greater
+default_multiplier <- 1.5
+multiplier_area <- max(multiplier_area, default_multiplier)
+multiplier_price <- max(multiplier_price, default_multiplier)
+
+# Define the upper bounds using the custom or default multipliers
+upper_bound_area <- Q3_area + multiplier_area * IQR_area
+upper_bound_price <- Q3_price + multiplier_price * IQR_price
+
+# No need to adjust the lower bounds for positive ranges, but you can do it similarly if needed
+lower_bound_area <- Q1_area - multiplier_area * IQR_area
+lower_bound_price <- Q1_price - multiplier_price * IQR_price
+
+# Filter out the outliers
+data_filtered <- subset(data_rent, area_m2 >= lower_bound_area & area_m2 <= upper_bound_area &
+  price_real_month >= lower_bound_price & price_real_month <= upper_bound_price)
+```
+
+```{r}
+# Plot the boxplots for area_m2 before and after outlier removal
+par(mfrow=c(2, 2)) # Set up the plotting area to have 2 rows and 2 columns
+
+# Area before outlier removal
+boxplot(data_rent$area_m2, main="Area (m²) Before Outlier Removal", horizontal = TRUE, col = "blue")
+# Price before outlier removal
+boxplot(data_rent$price_real_month, main="Price (R$/month) Before Outlier Removal", horizontal = TRUE, col = "red")
+
+# Area after outlier removal
+boxplot(data_filtered$area_m2, main="Area (m²) After Outlier Removal", horizontal = TRUE, col = "blue")
+
+# Price after outlier removal
+boxplot(data_filtered$price_real_month, main="Price (R$/month) After Outlier Removal", horizontal = TRUE, col = "red")
+```
+
+
+```{r}
+# Plot for original data
+p1 <- ggplot(data_rent, aes(x = area_m2, y = price_real_month)) +
+  geom_point(color = "grey", alpha = 0.5) +
+  labs(title = "Original Data",
+       x = "Area (m²)",
+       y = "Price (R$/month)") +
+  theme_light()
+
+# Plot for filtered data
+p2 <- ggplot(data_filtered, aes(x = area_m2, y = price_real_month)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "auto", se = FALSE, color = "blue") +
+  labs(title = "Filtered Data (Outliers Removed)",
+       x = "Area (m²)",
+       y = "Price (R$/month)") +
+  theme_light()
+
+# Arrange the plots side by side
+grid.arrange(p1, p2, ncol = 2)
+```
+Now, click the **Run** button on the chunk toolbar to [execute](https://www.jetbrains.com/help/pycharm/r-markdown.html#run-r-code) the chunk code. The result should be placed under the chunk.
+Click the **Knit and Open Document** to build and preview an output.
